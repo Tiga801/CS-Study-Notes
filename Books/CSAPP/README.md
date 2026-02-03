@@ -12,8 +12,8 @@
 
 | 章节 | 中文标题 | 英文标题 | 状态 |
 |------|----------|----------|------|
-| 00 | [前言](chapters/00-前言.md) | Preface | 待翻译 |
-| 01 | [计算机系统漫游](chapters/01-计算机系统漫游.md) | A Tour of Computer Systems | 待翻译 |
+| 00 | [前言](chapters/00-前言.md) | Preface | 已翻译 |
+| 01 | [计算机系统漫游](chapters/01-计算机系统漫游.md) | A Tour of Computer Systems | 已翻译 |
 | 02 | [信息的表示和处理](chapters/02-信息的表示和处理.md) | Representing and Manipulating Information | 待翻译 |
 | 03 | [程序的机器级表示](chapters/03-程序的机器级表示.md) | Machine-Level Representation of Programs | 待翻译 |
 | 04 | [处理器体系结构](chapters/04-处理器体系结构.md) | Processor Architecture | 待翻译 |

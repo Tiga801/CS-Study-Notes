@@ -1,0 +1,1576 @@
+--- Page 31 ---
+1
+A Tour of Computer Systems
+1.1
+Information Is Bits + Context
+39
+1.2
+Programs Are Translated by Other Programs into Different Forms
+40
+1.3
+It Pays to Understand How Compilation Systems Work
+42
+1.4
+Processors Read and Interpret Instructions Stored in Memory
+43
+1.5
+Caches Matter
+47
+1.6
+Storage Devices Form a Hierarchy
+50
+1.7
+The Operating System Manages the Hardware
+50
+1.8
+Systems Communicate with Other Systems Using Networks
+55
+1.9
+Important Themes
+58
+1.10
+Summary
+63
+Bibliographic Notes
+64
+Solutions to Practice Problems
+64
+
+
+--- Page 32 ---
+A
+computer system consists of hardware and systems software that work to-
+gether to run application programs. Speciﬁc implementations of systems
+change over time, but the underlying concepts do not. All computer systems have
+similar hardware and software components that perform similar functions. This
+book is written for programmers who want to get better at their craft by under-
+standing how these components work and how they affect the correctness and
+performance of their programs.
+You are poised for an exciting journey. If you dedicate yourself to learning the
+concepts in this book, then you will be on your way to becoming a rare “power pro-
+grammer,” enlightened by an understanding of the underlying computer system
+and its impact on your application programs.
+You are going to learn practical skills such as how to avoid strange numerical
+errors caused by the way that computers represent numbers. You will learn how
+to optimize your C code by using clever tricks that exploit the designs of modern
+processors and memory systems. You will learn how the compiler implements
+procedure calls and how to use this knowledge to avoid the security holes from
+buffer overﬂowvulnerabilitiesthatplaguenetworkandInternetsoftware.Youwill
+learn how to recognize and avoid the nasty errors during linking that confound
+the average programmer. You will learn how to write your own Unix shell, your
+own dynamic storage allocation package, and even your own Web server. You will
+learn the promises and pitfalls of concurrency, a topic of increasing importance as
+multiple processor cores are integrated onto single chips.
+In their classic text on the C programming language [61], Kernighan and
+Ritchie introduce readers to C using the hello program shown in Figure 1.1.
+Although hello is a very simple program, every major part of the system must
+work in concert in order for it to run to completion. In a sense, the goal of this
+book is to help you understand what happens and why when you run hello on
+your system.
+We begin our study of systems by tracing the lifetime of the hello program,
+from the time it is created by a programmer, until it runs on a system, prints its
+simple message, and terminates. As we follow the lifetime of the program, we will
+brieﬂy introduce the key concepts, terminology, and components that come into
+play. Later chapters will expand on these ideas.
+code/intro/hello.c
+1
+#include <stdio.h>
+2
+3
+int main()
+4
+{
+5
+printf("hello, world\n");
+6
+return 0;
+7
+}
+code/intro/hello.c
+Figure 1.1
+The hello program. (Source: [60])
+
+
+--- Page 33 ---
+#
+i
+n
+c
+l
+u
+d
+e
+SP
+<
+s
+t
+d
+i
+o
+.
+35
+105
+110
+99
+108
+117
+100
+101
+32
+60
+115
+116
+100
+105
+111
+46
+h
+>
+\n
+\n
+i
+n
+t
+SP
+m
+a
+i
+n
+(
+)
+\n
+{
+104
+62
+10
+10
+105
+110
+116
+32
+109
+97
+105
+110
+40
+41
+10
+123
+\n
+SP
+SP
+SP
+SP
+p
+r
+i
+n
+t
+f
+(
+"
+h
+e
+l
+10
+32
+32
+32
+32
+112
+114
+105
+110
+116
+102
+40
+34
+104
+101
+108
+l
+o
+,
+SP
+w
+o
+r
+l
+d
+\
+n
+"
+)
+;
+\n
+SP
+108
+111
+44
+32
+119
+111
+114
+108
+100
+92
+110
+34
+41
+59
+10
+32
+SP
+SP
+SP
+r
+e
+t
+u
+r
+n
+SP
+0
+;
+\n
+}
+\n
+32
+32
+32
+114
+101
+116
+117
+114
+110
+32
+48
+59
+10
+125
+10
+Figure 1.2
+The ASCII text representation of hello.c.
+1.1
+Information Is Bits + Context
+Our hello program begins life as a source program (or source ﬁle) that the
+programmer creates with an editor and saves in a text ﬁle called hello.c. The
+source program is a sequence of bits, each with a value of 0 or 1, organized in 8-bit
+chunks called bytes. Each byte represents some text character in the program.
+Most computer systems represent text characters using the ASCII standard
+that represents each character with a unique byte-size integer value.1 For example,
+Figure 1.2 shows the ASCII representation of the hello.c program.
+The hello.c program is stored in a ﬁle as a sequence of bytes. Each byte has
+an integer value that corresponds to some character. For example, the ﬁrst byte
+has the integer value 35, which corresponds to the character ‘#’. The second byte
+has the integer value 105, which corresponds to the character ‘i’, and so on. Notice
+that each text line is terminated by the invisible newline character ‘\n’, which is
+represented by the integer value 10. Files such as hello.c that consist exclusively
+of ASCII characters are known as text ﬁles. All other ﬁles are known as binary
+ﬁles.
+The representation of hello.c illustrates a fundamental idea: All information
+in a system—including disk ﬁles, programs stored in memory, user data stored in
+memory, and data transferred across a network—is represented as a bunch of bits.
+The only thing that distinguishes different data objects is the context in which
+we view them. For example, in different contexts, the same sequence of bytes
+might represent an integer, ﬂoating-point number, character string, or machine
+instruction.
+As programmers, we need to understand machine representations of numbers
+because they are not the same as integers and real numbers. They are ﬁnite
+1. Other encoding methods are used to represent text in non-English languages. See the aside on page
+86 for a discussion on this.
+
+
+--- Page 34 ---
+Aside
+Origins of the C programming language
+C was developed from 1969 to 1973 by Dennis Ritchie of Bell Laboratories. The American National
+Standards Institute (ANSI) ratiﬁed the ANSI C standard in 1989, and this standardization later became
+the responsibility of the International Standards Organization (ISO). The standards deﬁne the C
+language and a set of library functions known as the C standard library. Kernighan and Ritchie describe
+ANSI C in their classic book, which is known affectionately as “K&R” [61]. In Ritchie’s words [92], C
+is “quirky, ﬂawed, and an enormous success.” So why the success?
+. C was closely tied with the Unix operating system. C was developed from the beginning as the
+system programming language for Unix. Most of the Unix kernel (the core part of the operating
+system), and all of its supporting tools and libraries, were written in C. As Unix became popular in
+universities in the late 1970s and early 1980s, many people were exposed to C and found that they
+liked it. Since Unix was written almost entirely in C, it could be easily ported to new machines,
+which created an even wider audience for both C and Unix.
+. C is a small, simple language.The design was controlled by a single person, rather than a committee,
+and the result was a clean, consistent design with little baggage. The K&R book describes the
+complete language and standard library, with numerous examples and exercises, in only 261 pages.
+The simplicity of C made it relatively easy to learn and to port to different computers.
+. C was designed for a practical purpose. C was designed to implement the Unix operating system.
+Later, other people found that they could write the programs they wanted, without the language
+getting in the way.
+C is the language of choice for system-level programming, and there is a huge installed base of
+application-level programs as well. However, it is not perfect for all programmers and all situations.
+C pointers are a common source of confusion and programming errors. C also lacks explicit support
+for useful abstractions such as classes, objects, and exceptions. Newer languages such as C++ and Java
+address these issues for application-level programs.
+approximations that can behave in unexpected ways. This fundamental idea is
+explored in detail in Chapter 2.
+1.2
+Programs Are Translated by Other Programs
+into Different Forms
+The hello program begins life as a high-level C program because it can be read
+and understood by human beings in that form. However, in order to run hello.c
+on the system, the individual C statements must be translated by other programs
+into a sequence of low-level machine-language instructions. These instructions are
+then packaged in a form called an executable object program and stored as a binary
+disk ﬁle. Object programs are also referred to as executable object ﬁles.
+On a Unix system, the translation from source ﬁle to object ﬁle is performed
+by a compiler driver:
+
+
+--- Page 35 ---
+Pre-
+processor
+(cpp)
+Compiler
+(cc1)
+Assembler
+(as)
+Linker
+(ld)
+hello.c
+hello.i
+hello.s
+hello.o
+printf.o
+hello
+Source
+program
+(text)
+Modified
+source
+program
+(text)
+Assembly
+program
+(text)
+Relocatable
+object
+programs
+(binary)
+Executable
+object
+program
+(binary)
+Figure 1.3
+The compilation system.
+linux> gcc -o hello hello.c
+Here, the gcc compiler driver reads the source ﬁle hello.c and translates it into
+an executable object ﬁle hello. The translation is performed in the sequence
+of four phases shown in Figure 1.3. The programs that perform the four phases
+(preprocessor, compiler, assembler, and linker) are known collectively as the
+compilation system.
+. Preprocessing phase.The preprocessor (cpp) modiﬁes the original C program
+according to directives that begin with the ‘#’ character. For example, the
+#include <stdio.h> command in line 1 of hello.c tells the preprocessor
+to read the contents of the system header ﬁle stdio.h and insert it directly
+into the program text. The result is another C program, typically with the .i
+sufﬁx.
+. Compilation phase. The compiler (cc1) translates the text ﬁle hello.i into
+the text ﬁle hello.s, which contains an assembly-language program. This
+program includes the following deﬁnition of function main:
+1
+main:
+2
+subq
+$8, %rsp
+3
+movl
+$.LC0, %edi
+4
+call
+puts
+5
+movl
+$0, %eax
+6
+addq
+$8, %rsp
+7
+ret
+Each of lines 2–7 in this deﬁnition describes one low-level machine-
+language instruction in a textual form. Assembly language is useful because
+it provides a common output language for different compilers for different
+high-level languages. For example, C compilers and Fortran compilers both
+generate output ﬁles in the same assembly language.
+. Assembly phase. Next, the assembler (as) translates hello.s into machine-
+language instructions, packages them in a form known as a relocatable object
+program, and stores the result in the object ﬁle hello.o. This ﬁle is a binary
+ﬁle containing 17 bytes to encode the instructions for function main. If we
+were to view hello.o with a text editor, it would appear to be gibberish.
+
+
+--- Page 36 ---
+Aside
+The GNU project
+Gcc is one of many useful tools developed by the GNU (short for GNU’s Not Unix) project. The
+GNU project is a tax-exempt charity started by Richard Stallman in 1984, with the ambitious goal of
+developing a complete Unix-like system whose source code is unencumbered by restrictions on how
+it can be modiﬁed or distributed. The GNU project has developed an environment with all the major
+components of a Unix operating system, except for the kernel, which was developed separately by
+the Linux project. The GNU environment includes the emacs editor, gcc compiler, gdb debugger,
+assembler, linker, utilities for manipulating binaries, and other components. The gcc compiler has
+grown to support many different languages, with the ability to generate code for many different
+machines. Supported languages include C, C++, Fortran, Java, Pascal, Objective-C, and Ada.
+The GNU project is a remarkable achievement, and yet it is often overlooked. The modern open-
+source movement (commonly associated with Linux) owes its intellectual origins to the GNU project’s
+notion of free software (“free” as in “free speech,” not “free beer”). Further, Linux owes much of its
+popularity to the GNU tools, which provide the environment for the Linux kernel.
+. Linkingphase.Noticethatour helloprogramcallstheprintffunction, which
+is part of the standard C library provided by every C compiler. The printf
+function resides in a separate precompiled object ﬁle called printf.o, which
+must somehow be merged with our hello.o program. The linker (ld) handles
+this merging. The result is the hello ﬁle, which is an executable object ﬁle (or
+simply executable) that is ready to be loaded into memory and executed by
+the system.
+1.3
+It Pays to Understand How Compilation Systems Work
+For simple programs such as hello.c, we can rely on the compilation system to
+produce correct and efﬁcient machine code. However, there are some important
+reasons why programmers need to understand how compilation systems work:
+. Optimizing program performance. Modern compilers are sophisticated tools
+that usually produce good code. As programmers, we do not need to know
+the inner workings of the compiler in order to write efﬁcient code. However,
+in order to make good coding decisions in our C programs, we do need a
+basic understanding of machine-level code and how the compiler translates
+different C statements into machine code. For example, is a switch statement
+always more efﬁcient than a sequence of if-else statements? How much
+overhead is incurred by a function call? Is a while loop more efﬁcient than
+a for loop? Are pointer references more efﬁcient than array indexes? Why
+does our loop run so much faster if we sum into a local variable instead of an
+argument that is passed by reference? How can a function run faster when we
+simply rearrange the parentheses in an arithmetic expression?
+
+
+--- Page 37 ---
+In Chapter 3, we introduce x86-64, the machine language of recent gen-
+erations of Linux, Macintosh, and Windows computers. We describe how
+compilers translate different C constructs into this language. In Chapter 5,
+you will learn how to tune the performance of your C programs by making
+simple transformations to the C code that help the compiler do its job better.
+In Chapter 6, you will learn about the hierarchical nature of the memory sys-
+tem, how C compilers store data arrays in memory, and how your C programs
+can exploit this knowledge to run more efﬁciently.
+. Understanding link-time errors. In our experience, some of the most perplex-
+ing programming errors are related to the operation of the linker, especially
+when you are trying to build large software systems. For example, what does
+it mean when the linker reports that it cannot resolve a reference? What is the
+difference between a static variable and a global variable? What happens if
+you deﬁne two global variables in different C ﬁles with the same name? What
+is the difference between a static library and a dynamic library? Why does it
+matter what order we list libraries on the command line? And scariest of all,
+why do some linker-related errors not appear until run time? You will learn
+the answers to these kinds of questions in Chapter 7.
+. Avoiding security holes. For many years, buffer overﬂow vulnerabilities have
+accounted for many of the security holes in network and Internet servers.
+These vulnerabilities exist because too few programmers understand the need
+to carefully restrict the quantity and forms of data they accept from untrusted
+sources. A ﬁrst step in learning secure programming is to understand the con-
+sequences of the way data and control information are stored on the program
+stack. We cover the stack discipline and buffer overﬂow vulnerabilities in
+Chapter 3 as part of our study of assembly language. We will also learn about
+methods that can be used by the programmer, compiler, and operating system
+to reduce the threat of attack.
+1.4
+Processors Read and Interpret Instructions
+Stored in Memory
+At this point, our hello.c source program has been translated by the compilation
+system into an executable object ﬁle called hello that is stored on disk. To run
+the executable ﬁle on a Unix system, we type its name to an application program
+known as a shell:
+linux> ./hello
+hello, world
+linux>
+The shell is a command-line interpreter that prints a prompt, waits for you
+to type a command line, and then performs the command. If the ﬁrst word of the
+command line does not correspond to a built-in shell command, then the shell
+
+
+--- Page 38 ---
+Figure 1.4
+Hardware organization
+of a typical system. CPU:
+central processing unit,
+ALU: arithmetic/logic unit,
+PC: program counter, USB:
+Universal Serial Bus.
+CPU
+Register file
+PC
+ALU
+Bus interface
+I/O
+bridge
+System bus
+Memory bus
+Main
+memory
+I/O bus
+Expansion slots for
+other devices such
+as network adapters
+Disk
+controller
+Graphics
+adapter
+Display
+Mouse Keyboard
+USB
+controller
+Disk
+hello executable
+stored on disk
+assumes that it is the name of an executable ﬁle that it should load and run. So
+in this case, the shell loads and runs the hello program and then waits for it to
+terminate.The hello program printsitsmessagetothescreenandthenterminates.
+The shell then prints a prompt and waits for the next input command line.
+1.4.1
+Hardware Organization of a System
+To understand what happens to our hello program when we run it, we need
+to understand the hardware organization of a typical system, which is shown
+in Figure 1.4. This particular picture is modeled after the family of recent Intel
+systems, but all systems have a similar look and feel. Don’t worry about the
+complexity of this ﬁgure just now. We will get to its various details in stages
+throughout the course of the book.
+Buses
+Running throughout the system is a collection of electrical conduits called buses
+that carry bytes of information back and forth between the components. Buses
+are typically designed to transfer ﬁxed-size chunks of bytes known as words. The
+number of bytes in a word (the word size) is a fundamental system parameter that
+varies across systems. Most machines today have word sizes of either 4 bytes (32
+bits) or 8 bytes (64 bits). In this book, we do not assume any ﬁxed deﬁnition of
+word size. Instead, we will specify what we mean by a “word” in any context that
+requires this to be deﬁned.
+
+
+--- Page 39 ---
+I/O Devices
+Input/output (I/O) devices are the system’s connection to the external world. Our
+example system has four I/O devices: a keyboard and mouse for user input, a
+display for user output, and a disk drive (or simply disk) for long-term storage of
+data and programs. Initially, the executable hello program resides on the disk.
+Each I/O device is connected to the I/O bus by either a controller or an adapter.
+The distinction between the two is mainly one of packaging. Controllers are chip
+sets in the device itself or on the system’s main printed circuit board (often called
+the motherboard). An adapter is a card that plugs into a slot on the motherboard.
+Regardless, the purpose of each is to transfer information back and forth between
+the I/O bus and an I/O device.
+Chapter 6 has more to say about how I/O devices such as disks work. In
+Chapter 10, you will learn how to use the Unix I/O interface to access devices from
+your application programs. We focus on the especially interesting class of devices
+known as networks, but the techniques generalize to other kinds of devices as well.
+Main Memory
+The main memory is a temporary storage device that holds both a program and
+the data it manipulates while the processor is executing the program. Physically,
+main memory consists of a collection of dynamic random access memory (DRAM)
+chips. Logically, memory is organized as a linear array of bytes, each with its own
+unique address (array index) starting at zero. In general, each of the machine
+instructions that constitute a program can consist of a variable number of bytes.
+The sizes of data items that correspond to C program variables vary according
+to type. For example, on an x86-64 machine running Linux, data of type short
+require 2 bytes, types int and float 4 bytes, and types long and double 8 bytes.
+Chapter 6 has more to say about how memory technologies such as DRAM
+chips work, and how they are combined to form main memory.
+Processor
+The central processing unit (CPU), or simply processor, is the engine that inter-
+prets (or executes) instructions stored in main memory. At its core is a word-size
+storage device (or register) called the program counter (PC). At any point in time,
+the PC points at (contains the address of) some machine-language instruction in
+main memory.2
+From the time that power is applied to the system until the time that the
+power is shut off, a processor repeatedly executes the instruction pointed at by the
+program counter and updates the program counter to point to the next instruction.
+A processor appears to operate according to a very simple instruction execution
+model, deﬁned by its instruction set architecture. In this model, instructions execute
+2. PC is also a commonly used acronym for “personal computer.” However, the distinction between
+the two should be clear from the context.
+
+
+--- Page 40 ---
+in strict sequence, and executing a single instruction involves performing a series
+of steps. The processor reads the instruction from memory pointed at by the
+program counter (PC), interprets the bits in the instruction, performs some simple
+operation dictated by the instruction, and then updates the PC to point to the next
+instruction, which may or may not be contiguous in memory to the instruction that
+was just executed.
+There are only a few of these simple operations, and they revolve around
+main memory, the register ﬁle, and the arithmetic/logic unit (ALU). The register
+ﬁle is a small storage device that consists of a collection of word-size registers, each
+with its own unique name. The ALU computes new data and address values. Here
+are some examples of the simple operations that the CPU might carry out at the
+request of an instruction:
+. Load: Copy a byte or a word from main memory into a register, overwriting
+the previous contents of the register.
+. Store: Copy a byte or a word from a register to a location in main memory,
+overwriting the previous contents of that location.
+. Operate: Copy the contents of two registers to the ALU, perform an arithmetic
+operation on the two words, and store the result in a register, overwriting the
+previous contents of that register.
+. Jump: Extract a word from the instruction itself and copy that word into the
+program counter (PC), overwriting the previous value of the PC.
+We say that a processor appears to be a simple implementation of its in-
+struction set architecture, but in fact modern processors use far more complex
+mechanisms to speed up program execution. Thus, we can distinguish the pro-
+cessor’s instruction set architecture, describing the effect of each machine-code
+instruction, from its microarchitecture, describing how the processor is actually
+implemented. When we study machine code in Chapter 3, we will consider the
+abstraction provided by the machine’s instruction set architecture. Chapter 4 has
+more to say about how processors are actually implemented. Chapter 5 describes
+a model of how modern processors work that enables predicting and optimizing
+the performance of machine-language programs.
+1.4.2
+Running the hello Program
+Given this simple view of a system’s hardware organization and operation, we can
+begin to understand what happens when we run our example program. We must
+omit a lot of details here that will be ﬁlled in later, but for now we will be content
+with the big picture.
+Initially, the shell program is executing its instructions, waiting for us to type a
+command. As we type the characters ./hello at the keyboard, the shell program
+reads each one into a register and then stores it in memory, as shown in Figure 1.5.
+When we hit the enter key on the keyboard, the shell knows that we have
+ﬁnished typing the command. The shell then loads the executable hello ﬁle by
+executing a sequence of instructions that copies the code and data in the hello
+
+
+--- Page 41 ---
+Figure 1.5
+Reading the hello
+command from the
+keyboard.
+CPU
+Register file
+PC
+ALU
+Bus interface
+I/O
+bridge
+System bus
+Memory bus
+Main
+memory
+I/O bus
+Expansion slots for
+other devices such
+as network adapters
+Disk
+controller
+Graphics
+adapter
+Display
+Mouse  Keyboard
+USB
+controller
+Disk
+“hello”
+User
+types
+“hello”
+object ﬁle from disk to main memory. The data includes the string of characters
+hello, world\n that will eventually be printed out.
+Using a technique known as direct memory access (DMA, discussed in Chap-
+ter 6), the data travel directly from disk to main memory, without passing through
+the processor. This step is shown in Figure 1.6.
+Once the code and data in the hello object ﬁle are loaded into memory,
+the processor begins executing the machine-language instructions in the hello
+program’s main routine. These instructions copy the bytes in the hello, world\n
+string from memory to the register ﬁle, and from there to the display device, where
+they are displayed on the screen. This step is shown in Figure 1.7.
+1.5
+Caches Matter
+An important lesson from this simple example is that a system spends a lot of
+time moving information from one place to another. The machine instructions in
+the hello program are originally stored on disk. When the program is loaded,
+they are copied to main memory. As the processor runs the program, instruc-
+tions are copied from main memory into the processor. Similarly, the data string
+hello,world\n, originally on disk, is copied to main memory and then copied
+from main memory to the display device. From a programmer’s perspective, much
+of this copying is overhead that slows down the “real work” of the program. Thus,
+a major goal for system designers is to make these copy operations run as fast as
+possible.
+Because of physical laws, larger storage devices are slower than smaller stor-
+age devices. And faster devices are more expensive to build than their slower
+
+
+--- Page 42 ---
+Disk
+CPU
+Register file
+PC
+ALU
+Bus interface
+I/O
+bridge
+System bus
+Memory bus
+Main
+memory
+I/O bus
+Expansion slots for
+other devices such
+as network adapters
+Disk
+controller
+Graphics
+adapter
+Display
+Mouse Keyboard
+USB
+controller
+“hello, world\n”
+hello code
+hello executable
+stored on disk
+Figure 1.6
+Loading the executable from disk into main memory.
+CPU
+Register file
+PC
+ALU
+Bus interface
+I/O
+bridge
+System bus
+Memory bus
+Main
+memory
+I/O bus
+Expansion slots for
+other devices such
+as network adapters
+Disk
+controller
+Graphics
+adapter
+Display
+Mouse Keyboard
+USB
+controller
+Disk
+“hello, world\n”
+“hello, world\n”
+hello code
+hello executable
+stored on disk
+Figure 1.7
+Writing the output string from memory to the display.
+
+
+--- Page 43 ---
+Figure 1.8
+Cache memories.
+I/O
+bridge
+CPU chip
+Cache
+memories
+Register file
+System bus
+Memory bus
+Bus interface
+Main
+memory
+ALU
+counterparts. For example, the disk drive on a typical system might be 1,000 times
+larger than the main memory, but it might take the processor 10,000,000 times
+longer to read a word from disk than from memory.
+Similarly, a typical register ﬁle stores only a few hundred bytes of information,
+as opposed to billions of bytes in the main memory. However, the processor can
+read data from the register ﬁle almost 100 times faster than from memory. Even
+more troublesome, as semiconductor technology progresses over the years, this
+processor–memory gap continues to increase. It is easier and cheaper to make
+processors run faster than it is to make main memory run faster.
+To deal with the processor–memory gap, system designers include smaller,
+faster storage devices called cache memories (or simply caches) that serve as
+temporary staging areas for information that the processor is likely to need in
+the near future. Figure 1.8 shows the cache memories in a typical system. An L1
+cache on the processor chip holds tens of thousands of bytes and can be accessed
+nearly as fast as the register ﬁle. A larger L2 cache with hundreds of thousands
+to millions of bytes is connected to the processor by a special bus. It might take 5
+times longer for the processor to access the L2 cache than the L1 cache, but this is
+still 5 to 10 times faster than accessing the main memory. The L1 and L2 caches are
+implemented with a hardware technology known as static random access memory
+(SRAM). Newer and more powerful systems even have three levels of cache: L1,
+L2, and L3. The idea behind caching is that a system can get the effect of both
+a very large memory and a very fast one by exploiting locality, the tendency for
+programs to access data and code in localized regions. By setting up caches to hold
+data that are likely to be accessed often, we can perform most memory operations
+using the fast caches.
+One of the most important lessons in this book is that application program-
+mers who are aware of cache memories can exploit them to improve the perfor-
+mance of their programs by an order of magnitude. You will learn more about
+these important devices and how to exploit them in Chapter 6.
+
+
+--- Page 44 ---
+CPU registers hold words 
+retrieved from cache memory.
+L1 cache holds cache lines 
+retrieved from L2 cache.
+L2 cache holds cache lines
+retrieved from L3 cache.
+Main memory holds disk blocks 
+retrieved from local disks.
+Local disks hold files
+retrieved from disks on
+remote network server.
+Regs
+L3 cache
+(SRAM)
+L2 cache
+(SRAM)
+L1 cache
+(SRAM)
+Main memory
+(DRAM)
+Local secondary storage
+(local disks)
+Remote secondary storage
+(distributed file systems, Web servers)
+Smaller,
+faster,
+and
+costlier
+(per byte)
+storage
+devices
+Larger,
+slower,
+and
+cheaper
+(per byte)
+storage
+devices
+L0:
+L1:
+L2:
+L3:
+L4:
+L5:
+L6:
+L3 cache holds cache lines
+retrieved from memory.
+Figure 1.9
+An example of a memory hierarchy.
+1.6
+Storage Devices Form a Hierarchy
+This notion of inserting a smaller, faster storage device (e.g., cache memory)
+between the processor and a larger, slower device (e.g., main memory) turns out
+to be a general idea. In fact, the storage devices in every computer system are
+organized as a memory hierarchy similar to Figure 1.9. As we move from the top
+of the hierarchy to the bottom, the devices become slower, larger, and less costly
+per byte. The register ﬁle occupies the top level in the hierarchy, which is known
+as level 0 or L0. We show three levels of caching L1 to L3, occupying memory
+hierarchy levels 1 to 3. Main memory occupies level 4, and so on.
+The main idea of a memory hierarchy is that storage at one level serves as a
+cache for storage at the next lower level. Thus, the register ﬁle is a cache for the
+L1 cache. Caches L1 and L2 are caches for L2 and L3, respectively. The L3 cache
+is a cache for the main memory, which is a cache for the disk. On some networked
+systems with distributed ﬁle systems, the local disk serves as a cache for data stored
+on the disks of other systems.
+Just as programmers can exploit knowledge of the different caches to improve
+performance, programmers can exploit their understanding of the entire memory
+hierarchy. Chapter 6 will have much more to say about this.
+1.7
+The Operating System Manages the Hardware
+Back to our hello example. When the shell loaded and ran the hello program,
+and when the hello program printed its message, neither program accessed the
+
+
+--- Page 45 ---
+Figure 1.10
+Layered view of a
+computer system.
+Application programs
+Operating system
+Main memory
+I/O devices
+Processor
+Software
+Hardware
+Figure 1.11
+Abstractions provided by
+an operating system.
+Main memory
+I/O devices
+Processor
+Processes
+Virtual memory
+Files
+keyboard, display, disk, or main memory directly. Rather, they relied on the
+services provided by the operating system. We can think of the operating system as
+a layer of software interposed between the application program and the hardware,
+as shown in Figure 1.10. All attempts by an application program to manipulate the
+hardware must go through the operating system.
+The operating system has two primary purposes: (1) to protect the hardware
+from misuse by runaway applications and (2) to provide applications with simple
+and uniform mechanisms for manipulating complicated and often wildly different
+low-level hardware devices. The operating system achieves both goals via the
+fundamental abstractions shown in Figure 1.11: processes, virtual memory, and
+ﬁles. As this ﬁgure suggests, ﬁles are abstractions for I/O devices, virtual memory
+is an abstraction for both the main memory and disk I/O devices, and processes
+are abstractions for the processor, main memory, and I/O devices. We will discuss
+each in turn.
+1.7.1
+Processes
+When a program such as hello runs on a modern system, the operating system
+provides the illusion that the program is the only one running on the system. The
+program appears to have exclusive use of both the processor, main memory, and
+I/O devices. The processor appears to execute the instructions in the program, one
+after the other, without interruption. And the code and data of the program appear
+to be the only objects in the system’s memory. These illusions are provided by the
+notion of a process, one of the most important and successful ideas in computer
+science.
+A process is the operating system’s abstraction for a running program. Multi-
+ple processes can run concurrently on the same system, and each process appears
+to have exclusive use of the hardware. By concurrently, we mean that the instruc-
+tions of one process are interleaved with the instructions of another process. In
+most systems, there are more processes to run than there are CPUs to run them.
+
+
+--- Page 46 ---
+Aside
+Unix, Posix, and the Standard Unix Speciﬁcation
+The 1960s was an era of huge, complex operating systems, such as IBM’s OS/360 and Honeywell’s
+Multics systems. While OS/360 was one of the most successful software projects in history, Multics
+dragged on for years and never achieved wide-scale use. Bell Laboratories was an original partner in
+the Multics project but dropped out in 1969 because of concern over the complexity of the project
+and the lack of progress. In reaction to their unpleasant Multics experience, a group of Bell Labs
+researchers—Ken Thompson, Dennis Ritchie, Doug McIlroy, and Joe Ossanna—began work in 1969
+on a simpler operating system for a Digital Equipment Corporation PDP-7 computer, written entirely
+in machine language. Many of the ideas in the new system, such as the hierarchical ﬁle system and the
+notion of a shell as a user-level process, were borrowed from Multics but implemented in a smaller,
+simpler package. In 1970, Brian Kernighan dubbed the new system “Unix” as a pun on the complexity
+of “Multics.” The kernel was rewritten in C in 1973, and Unix was announced to the outside world in
+1974 [93].
+Because Bell Labs made the source code available to schools with generous terms, Unix developed
+a large following at universities. The most inﬂuential work was done at the University of California
+at Berkeley in the late 1970s and early 1980s, with Berkeley researchers adding virtual memory and
+the Internet protocols in a series of releases called Unix 4.xBSD (Berkeley Software Distribution).
+Concurrently, Bell Labs was releasing their own versions, which became known as System V Unix.
+Versions from other vendors, such as the Sun Microsystems Solaris system, were derived from these
+original BSD and System V versions.
+Trouble arose in the mid 1980s as Unix vendors tried to differentiate themselves by adding new
+and often incompatible features. To combat this trend, IEEE (Institute for Electrical and Electron-
+ics Engineers) sponsored an effort to standardize Unix, later dubbed “Posix” by Richard Stallman.
+The result was a family of standards, known as the Posix standards, that cover such issues as the C
+language interface for Unix system calls, shell programs and utilities, threads, and network program-
+ming. More recently, a separate standardization effort, known as the “Standard Unix Speciﬁcation,”
+has joined forces with Posix to create a single, uniﬁed standard for Unix systems. As a result of these
+standardization efforts, the differences between Unix versions have largely disappeared.
+Traditional systems could only execute one program at a time, while newer multi-
+core processors can execute several programs simultaneously. In either case, a
+single CPU can appear to execute multiple processes concurrently by having the
+processor switch among them. The operating system performs this interleaving
+with a mechanism known as context switching. To simplify the rest of this discus-
+sion, we consider only a uniprocessor system containing a single CPU. We will
+return to the discussion of multiprocessor systems in Section 1.9.2.
+The operating system keeps track of all the state information that the process
+needs in order to run. This state, which is known as the context, includes informa-
+tion such as the current values of the PC, the register ﬁle, and the contents of main
+memory. At any point in time, a uniprocessor system can only execute the code
+for a single process. When the operating system decides to transfer control from
+the current process to some new process, it performs a context switch by saving
+the context of the current process, restoring the context of the new process, and
+
+
+--- Page 47 ---
+Figure 1.12
+Process context
+switching.
+Process A
+read
+Process B
+User code
+Kernel code
+Kernel code
+User code
+User code
+Context
+switch
+Context
+switch
+Time
+Disk interrupt
+Return
+from read
+then passing control to the new process. The new process picks up exactly where
+it left off. Figure 1.12 shows the basic idea for our example hello scenario.
+There are two concurrent processes in our example scenario: the shell process
+and the hello process. Initially, the shell process is running alone, waiting for input
+on the command line. When we ask it to run the hello program, the shell carries
+out our request by invoking a special function known as a system call that passes
+control to the operating system. The operating system saves the shell’s context,
+creates a new hello process and its context, and then passes control to the new
+hello process. After hello terminates, the operating system restores the context
+of the shell process and passes control back to it, where it waits for the next
+command-line input.
+As Figure 1.12 indicates, the transition from one process to another is man-
+aged by the operating system kernel. The kernel is the portion of the operating
+system code that is always resident in memory. When an application program
+requires some action by the operating system, such as to read or write a ﬁle, it
+executes a special system call instruction, transferring control to the kernel. The
+kernel then performs the requested operation and returns back to the application
+program. Note that the kernel is not a separate process. Instead, it is a collection
+of code and data structures that the system uses to manage all the processes.
+Implementing the process abstraction requires close cooperation between
+both the low-level hardware and the operating system software. We will explore
+how this works, and how applications can create and control their own processes,
+in Chapter 8.
+1.7.2
+Threads
+Although we normally think of a process as having a single control ﬂow, in modern
+systems a process can actually consist of multiple execution units, called threads,
+each running in the context of the process and sharing the same code and global
+data. Threads are an increasingly important programming model because of the
+requirement for concurrency in network servers, because it is easier to share data
+between multiple threads than between multiple processes, and because threads
+are typically more efﬁcient than processes. Multi-threading is also one way to make
+programs run faster when multiple processors are available, as we will discuss in
+
+
+--- Page 48 ---
+Figure 1.13
+Process virtual address
+space. (The regions are not
+drawn to scale.)
+0
+Memory
+invisible to
+user code
+printf function
+Loaded from the
+hello executable file
+Program
+start
+User stack
+(created at run time)
+Memory-mapped region for
+shared libraries
+Run-time heap
+(created by malloc)
+Read/write data
+Read-only code and data
+Kernel virtual memory
+Section 1.9.2. You will learn the basic concepts of concurrency, including how to
+write threaded programs, in Chapter 12.
+1.7.3
+Virtual Memory
+Virtual memory is an abstraction that provides each process with the illusion that it
+has exclusive use of the main memory. Each process has the same uniform view of
+memory, which is known as its virtual address space. The virtual address space for
+Linux processes is shown in Figure 1.13. (Other Unix systems use a similar layout.)
+In Linux, the topmost region of the address space is reserved for code and data
+in the operating system that is common to all processes. The lower region of the
+address space holds the code and data deﬁned by the user’s process. Note that
+addresses in the ﬁgure increase from the bottom to the top.
+The virtual address space seen by each process consists of a number of well-
+deﬁned areas, each with a speciﬁc purpose. You will learn more about these areas
+later in the book, but it will be helpful to look brieﬂy at each, starting with the
+lowest addresses and working our way up:
+. Program code and data.Code begins at the same ﬁxed address for all processes,
+followed by data locations that correspond to global C variables. The code and
+data areas are initialized directly from the contents of an executable object
+ﬁle—in our case, the hello executable. You will learn more about this part of
+the address space when we study linking and loading in Chapter 7.
+. Heap.The code and data areas are followed immediately by the run-time heap.
+Unlike the code and data areas, which are ﬁxed in size once the process begins
+
+
+--- Page 49 ---
+running, the heap expands and contracts dynamically at run time as a result
+of calls to C standard library routines such as malloc and free. We will study
+heaps in detail when we learn about managing virtual memory in Chapter 9.
+. Shared libraries.Near the middle of the address space is an area that holds the
+code and data for shared libraries such as the C standard library and the math
+library. The notion of a shared library is a powerful but somewhat difﬁcult
+concept. You will learn how they work when we study dynamic linking in
+Chapter 7.
+. Stack. At the top of the user’s virtual address space is the user stack that
+the compiler uses to implement function calls. Like the heap, the user stack
+expands and contracts dynamically during the execution of the program. In
+particular, each time we call a function, the stack grows. Each time we return
+from a function, it contracts. You will learn how the compiler uses the stack
+in Chapter 3.
+. Kernel virtual memory.The top region of the address space is reserved for the
+kernel. Application programs are not allowed to read or write the contents of
+this area or to directly call functions deﬁned in the kernel code. Instead, they
+must invoke the kernel to perform these operations.
+For virtual memory to work, a sophisticated interaction is required between
+the hardware and the operating system software, including a hardware translation
+of every address generated by the processor. The basic idea is to store the contents
+of a process’s virtual memory on disk and then use the main memory as a cache
+for the disk. Chapter 9 explains how this works and why it is so important to the
+operation of modern systems.
+1.7.4
+Files
+A ﬁle is a sequence of bytes, nothing more and nothing less. Every I/O device,
+including disks, keyboards, displays, and even networks, is modeled as a ﬁle. All
+input and output in the system is performed by reading and writing ﬁles, using a
+small set of system calls known as Unix I/O.
+This simple and elegant notion of a ﬁle is nonetheless very powerful because
+it provides applications with a uniform view of all the varied I/O devices that
+might be contained in the system. For example, application programmers who
+manipulate the contents of a disk ﬁle are blissfully unaware of the speciﬁc disk
+technology. Further, the same program will run on different systems that use
+different disk technologies. You will learn about Unix I/O in Chapter 10.
+1.8
+Systems Communicate with Other Systems
+Using Networks
+Up to this point in our tour of systems, we have treated a system as an isolated
+collection of hardware and software. In practice, modern systems are often linked
+to other systems by networks. From the point of view of an individual system, the
+
+
+--- Page 50 ---
+Aside
+The Linux project
+In August 1991, a Finnish graduate student named Linus Torvalds modestly announced a new Unix-like
+operating system kernel:
+From: torvalds@klaava.Helsinki.FI (Linus Benedict Torvalds)
+Newsgroups: comp.os.minix
+Subject: What would you like to see most in minix?
+Summary: small poll for my new operating system
+Date: 25 Aug 91 20:57:08 GMT
+Hello everybody out there using minix -
+I’m doing a (free) operating system (just a hobby, won’t be big and
+professional like gnu) for 386(486) AT clones. This has been brewing
+since April, and is starting to get ready. I’d like any feedback on
+things people like/dislike in minix, as my OS resembles it somewhat
+(same physical layout of the file-system (due to practical reasons)
+among other things).
+I’ve currently ported bash(1.08) and gcc(1.40), and things seem to work.
+This implies that I’ll get something practical within a few months, and
+I’d like to know what features most people would want. Any suggestions
+are welcome, but I won’t promise I’ll implement them :-)
+Linus (torvalds@kruuna.helsinki.fi)
+As Torvalds indicates, his starting point for creating Linux was Minix, an operating system devel-
+oped by Andrew S. Tanenbaum for educational purposes [113].
+The rest, as they say, is history. Linux has evolved into a technical and cultural phenomenon. By
+combining forces with the GNU project, the Linux project has developed a complete, Posix-compliant
+version of the Unix operating system, including the kernel and all of the supporting infrastructure.
+Linux is available on a wide array of computers, from handheld devices to mainframe computers. A
+group at IBM has even ported Linux to a wristwatch!
+network can be viewed as just another I/O device, as shown in Figure 1.14. When
+the system copies a sequence of bytes from main memory to the network adapter,
+the data ﬂow across the network to another machine, instead of, say, to a local
+disk drive. Similarly, the system can read data sent from other machines and copy
+these data to its main memory.
+With the advent of global networks such as the Internet, copying information
+from one machine to another has become one of the most important uses of
+computer systems. For example, applications such as email, instant messaging, the
+World Wide Web, FTP, and telnet are all based on the ability to copy information
+over a network.
+
+
+--- Page 51 ---
+Figure 1.14
+A network is another I/O
+device.
+CPU chip
+Register file
+PC
+ALU
+Bus interface
+I/O
+bridge
+System bus
+Memory bus
+Main
+memory
+I/O bus
+Expansion slots
+Disk
+controller
+Network
+adapter
+Network
+Graphics
+adapter
+Monitor
+Mouse Keyboard
+USB
+controller
+Disk
+1.User types
+“hello” at the
+keyboard
+5. Client prints
+“hello, world\n”
+string on display
+2. Client sends “hello”
+string to telnet server
+4. Telnet server sends
+“hello, world\n” string
+to client
+3. Server sends “hello”
+string to the shell, which
+runs the hello program
+and passes the output
+to the telnet server
+Local
+telnet
+client
+Remote
+telnet
+server
+Figure 1.15
+Using telnet to run hello remotely over a network.
+Returning to our hello example, we could use the familiar telnet application
+to run hello on a remote machine. Suppose we use a telnet client running on our
+local machine to connect to a telnet server on a remote machine. After we log in
+to the remote machine and run a shell, the remote shell is waiting to receive an
+input command. From this point, running the hello program remotely involves
+the ﬁve basic steps shown in Figure 1.15.
+After we type in the hello string to the telnet client and hit the enter key,
+the client sends the string to the telnet server. After the telnet server receives the
+string from the network, it passes it along to the remote shell program. Next, the
+remote shell runs the hello program and passes the output line back to the telnet
+server. Finally, the telnet server forwards the output string across the network to
+the telnet client, which prints the output string on our local terminal.
+This type of exchange between clients and servers is typical of all network
+applications. In Chapter 11 you will learn how to build network applications and
+apply this knowledge to build a simple Web server.
+
+
+--- Page 52 ---
+1.9
+Important Themes
+This concludes our initial whirlwind tour of systems. An important idea to take
+away from this discussion is that a system is more than just hardware. It is a
+collection of intertwined hardware and systems software that must cooperate in
+order to achieve the ultimate goal of running application programs. The rest of
+this book will ﬁll in some details about the hardware and the software, and it will
+show how, by knowing these details, you can write programs that are faster, more
+reliable, and more secure.
+To close out this chapter, we highlight several important concepts that cut
+across all aspects of computer systems. We will discuss the importance of these
+concepts at multiple places within the book.
+1.9.1
+Amdahl’s Law
+Gene Amdahl, one of the early pioneers in computing, made a simple but insight-
+ful observation about the effectiveness of improving the performance of one part
+of a system. This observation has come to be known as Amdahl’s law. The main
+idea is that when we speed up one part of a system, the effect on the overall sys-
+tem performance depends on both how signiﬁcant this part was and how much
+it sped up. Consider a system in which executing some application requires time
+Told. Suppose some part of the system requires a fraction α of this time, and that
+we improve its performance by a factor of k. That is, the component originally re-
+quired time αTold, and it now requires time (αTold)/k. The overall execution time
+would thus be
+Tnew = (1 −α)Told + (αTold)/k
+= Told[(1 −α) + α/k]
+From this, we can compute the speedup S = Told/Tnew as
+S =
+1
+(1 −α) + α/k
+(1.1)
+As an example, consider the case where a part of the system that initially
+consumed 60% of the time (α = 0.6) is sped up by a factor of 3 (k = 3). Then
+we get a speedup of 1/[0.4 + 0.6/3] = 1.67×. Even though we made a substantial
+improvement to a major part of the system, our net speedup was signiﬁcantly less
+than the speedup for the one part. This is the major insight of Amdahl’s law—
+to signiﬁcantly speed up the entire system, we must improve the speed of a very
+large fraction of the overall system.
+Practice Problem 1.1 (solution page 64)
+Suppose you work as a truck driver, and you have been hired to carry a load of
+potatoes from Boise, Idaho, to Minneapolis, Minnesota, a total distance of 2,500
+kilometers. You estimate you can average 100 km/hr driving within the speed
+limits, requiring a total of 25 hours for the trip.
+
+
+--- Page 53 ---
+Aside
+Expressing relative performance
+The best way to express a performance improvement is as a ratio of the form Told/Tnew, where Told is
+the time required for the original version and Tnew is the time required by the modiﬁed version. This
+will be a number greater than 1.0 if any real improvement occurred. We use the sufﬁx ‘×’ to indicate
+such a ratio, where the factor “2.2×” is expressed verbally as “2.2 times.”
+The more traditional way of expressing relative change as a percentage works well when the
+change is small, but its deﬁnition is ambiguous. Should it be 100 . (Told −Tnew)/Tnew, or possibly
+100 . (Told −Tnew)/Told, or something else? In addition, it is less instructive for large changes. Saying
+that “performance improved by 120%” is more difﬁcult to comprehend than simply saying that the
+performance improved by 2.2×.
+A. You hear on the news that Montana has just abolished its speed limit, which
+constitutes 1,500 km of the trip. Your truck can travel at 150 km/hr. What
+will be your speedup for the trip?
+B. You can buy a new turbocharger for your truck at www.fasttrucks.com. They
+stock a variety of models, but the faster you want to go, the more it will cost.
+How fast must you travel through Montana to get an overall speedup for
+your trip of 1.67×?
+Practice Problem 1.2 (solution page 64)
+A car manufacturing company has promised their customers that the next release
+of a new engine will show a 4× performance improvement. You have been as-
+signed the task of delivering on that promise. You have determined that only 90%
+of the engine can be improved. How much (i.e., what value of k) would you need
+to improve this part to meet the overall performance target of the engine?
+One interesting special case of Amdahl’s law is to consider the effect of setting
+k to ∞. That is, we are able to take some part of the system and speed it up to the
+point at which it takes a negligible amount of time. We then get
+S∞=
+1
+(1 −α)
+(1.2)
+So, for example, if we can speed up 60% of the system to the point where it requires
+close to no time, our net speedup will still only be 1/0.4 = 2.5×.
+Amdahl’s law describes a general principle for improving any process. In
+addition to its application to speeding up computer systems, it can guide a company
+trying to reduce the cost of manufacturing razor blades, or a student trying to
+improve his or her grade point average. Perhaps it is most meaningful in the world
+
+
+--- Page 54 ---
+of computers, where we routinely improve performance by factors of 2 or more.
+Such high factors can only be achieved by optimizing large parts of a system.
+1.9.2
+Concurrency and Parallelism
+Throughout the history of digital computers, two demands have been constant
+forces in driving improvements: we want them to do more, and we want them to
+run faster. Both of these factors improve when the processor does more things at
+once. We use the term concurrency to refer to the general concept of a system with
+multiple, simultaneous activities, and the term parallelism to refer to the use of
+concurrency to make a system run faster. Parallelism can be exploited at multiple
+levels of abstraction in a computer system. We highlight three levels here, working
+from the highest to the lowest level in the system hierarchy.
+Thread-Level Concurrency
+Building on the process abstraction, we are able to devise systems where multiple
+programs execute at the same time, leading to concurrency. With threads, we
+can even have multiple control ﬂows executing within a single process. Support
+for concurrent execution has been found in computer systems since the advent
+of time-sharing in the early 1960s. Traditionally, this concurrent execution was
+only simulated, by having a single computer rapidly switch among its executing
+processes, much as a juggler keeps multiple balls ﬂying through the air. This form
+of concurrency allows multiple users to interact with a system at the same time,
+such as when many people want to get pages from a single Web server. It also
+allows a single user to engage in multiple tasks concurrently, such as having a
+Web browser in one window, a word processor in another, and streaming music
+playing at the same time. Until recently, most actual computing was done by a
+single processor, even if that processor had to switch among multiple tasks. This
+conﬁguration is known as a uniprocessor system.
+When we construct a system consisting of multiple processors all under the
+control of a single operating system kernel, we have a multiprocessor system.
+Such systems have been available for large-scale computing since the 1980s, but
+they have more recently become commonplace with the advent of multi-core
+processors and hyperthreading. Figure 1.16 shows a taxonomy of these different
+processor types.
+Multi-core processors have several CPUs (referred to as “cores”) integrated
+onto a single integrated-circuit chip. Figure 1.17 illustrates the organization of a
+Figure 1.16
+Categorizing different
+processor conﬁgurations.
+Multiprocessors are
+becoming prevalent
+with the advent of multi-
+core processors and
+hyperthreading.
+All processors
+Uniprocessors
+Multiprocessors
+Multi-
+core
+Hyper-
+threaded
+
+
+--- Page 55 ---
+Figure 1.17
+Multi-core processor
+organization. Four
+processor cores are
+integrated onto a single
+chip.
+Processor package
+Core 0
+Core 3
+. . .
+Regs
+L1
+d-cache
+L2 unified cache
+L3 unified cache
+(shared by all cores)
+Main memory
+L1
+i-cache
+Regs
+L1
+d-cache
+L2 unified cache
+L1
+i-cache
+typical multi-core processor, where the chip has four CPU cores, each with its
+own L1 and L2 caches, and with each L1 cache split into two parts—one to hold
+recently fetched instructions and one to hold data. The cores share higher levels of
+cache as well as the interface to main memory. Industry experts predict that they
+will be able to have dozens, and ultimately hundreds, of cores on a single chip.
+Hyperthreading, sometimes called simultaneous multi-threading, is a tech-
+nique that allows a single CPU to execute multiple ﬂows of control. It involves
+having multiple copies of some of the CPU hardware, such as program counters
+and register ﬁles, while having only single copies of other parts of the hardware,
+such as the units that perform ﬂoating-point arithmetic. Whereas a conventional
+processor requires around 20,000 clock cycles to shift between different threads,
+a hyperthreaded processor decides which of its threads to execute on a cycle-by-
+cycle basis. It enables the CPU to take better advantage of its processing resources.
+For example, if one thread must wait for some data to be loaded into a cache, the
+CPU can proceed with the execution of a different thread. As an example, the In-
+tel Core i7 processor can have each core executing two threads, and so a four-core
+system can actually execute eight threads in parallel.
+The use of multiprocessing can improve system performance in two ways.
+First, it reduces the need to simulate concurrency when performing multiple tasks.
+As mentioned, even a personal computer being used by a single person is expected
+to perform many activities concurrently. Second, it can run a single application
+program faster, but only if that program is expressed in terms of multiple threads
+that can effectively execute in parallel. Thus, although the principles of concur-
+rency have been formulated and studied for over 50 years, the advent of multi-core
+and hyperthreaded systems has greatly increased the desire to ﬁnd ways to write
+application programs that can exploit the thread-level parallelism available with
+
+
+--- Page 56 ---
+the hardware. Chapter 12 will look much more deeply into concurrency and its
+use to provide a sharing of processing resources and to enable more parallelism
+in program execution.
+Instruction-Level Parallelism
+At a much lower level of abstraction, modern processors can execute multiple
+instructions at one time, a property known as instruction-level parallelism. For
+example, early microprocessors, such as the 1978-vintage Intel 8086, required
+multiple (typically 3–10) clock cycles to execute a single instruction. More recent
+processors can sustain execution rates of 2–4 instructions per clock cycle. Any
+given instruction requires much longer from start to ﬁnish, perhaps 20 cycles or
+more, but the processor uses a number of clever tricks to process as many as 100
+instructions at a time. In Chapter 4, we will explore the use of pipelining, where the
+actions required to execute an instruction are partitioned into different steps and
+the processor hardware is organized as a series of stages, each performing one
+of these steps. The stages can operate in parallel, working on different parts of
+different instructions. We will see that a fairly simple hardware design can sustain
+an execution rate close to 1 instruction per clock cycle.
+Processors that can sustain execution rates faster than 1 instruction per cycle
+are known as superscalar processors. Most modern processors support superscalar
+operation. In Chapter 5, we will describe a high-level model of such processors.
+We will see that application programmers can use this model to understand the
+performance of their programs. They can then write programs such that the gen-
+erated code achieves higher degrees of instruction-level parallelism and therefore
+runs faster.
+Single-Instruction, Multiple-Data (SIMD) Parallelism
+At the lowest level, many modern processors have special hardware that allows
+a single instruction to cause multiple operations to be performed in parallel, a
+mode known as single-instruction, multiple-data (SIMD) parallelism. For example,
+recent generations of Intel and AMD processors have instructions that can add 8
+pairs of single-precision ﬂoating-point numbers (C data type float) in parallel.
+These SIMD instructions are provided mostly to speed up applications that
+process image, sound, and video data. Although some compilers attempt to auto-
+matically extract SIMD parallelism from C programs, a more reliable method is to
+write programs using special vector data types supported in compilers such as gcc.
+We describe this style of programming in Web Aside opt:simd, as a supplement to
+the more general presentation on program optimization found in Chapter 5.
+1.9.3
+The Importance of Abstractions in Computer Systems
+The use of abstractions is one of the most important concepts in computer science.
+For example, one aspect of good programming practice is to formulate a simple
+application program interface (API) for a set of functions that allow programmers
+to use the code without having to delve into its inner workings. Different program-
+
+
+--- Page 57 ---
+Figure 1.18
+Some abstractions
+provided by a computer
+system. A major theme
+in computer systems
+is to provide abstract
+representations at
+different levels to hide
+the complexity of the
+actual implementations.
+Main memory
+I/O devices
+Processor
+Operating system
+Processes
+Virtual memory
+Files
+Virtual machine
+Instruction set
+architecture
+ming languages provide different forms and levels of support for abstraction, such
+as Java class declarations and C function prototypes.
+We have already been introduced to several of the abstractions seen in com-
+puter systems, as indicated in Figure 1.18. On the processor side, the instruction set
+architecture provides an abstraction of the actual processor hardware. With this
+abstraction, a machine-code program behaves as if it were executed on a proces-
+sor that performs just one instruction at a time. The underlying hardware is far
+more elaborate, executing multiple instructions in parallel, but always in a way
+that is consistent with the simple, sequential model. By keeping the same execu-
+tion model, different processor implementations can execute the same machine
+code while offering a range of cost and performance.
+On the operating system side, we have introduced three abstractions: ﬁles as
+an abstraction of I/O devices, virtual memory as an abstraction of program mem-
+ory, and processes as an abstraction of a running program. To these abstractions
+we add a new one: the virtual machine, providing an abstraction of the entire
+computer, including the operating system, the processor, and the programs. The
+idea of a virtual machine was introduced by IBM in the 1960s, but it has become
+more prominent recently as a way to manage computers that must be able to run
+programs designed for multiple operating systems (such as Microsoft Windows,
+Mac OS X, and Linux) or different versions of the same operating system.
+We will return to these abstractions in subsequent sections of the book.
+1.10
+Summary
+A computer system consists of hardware and systems software that cooperate
+to run application programs. Information inside the computer is represented as
+groups of bits that are interpreted in different ways, depending on the context.
+Programs are translated by other programs into different forms, beginning as
+ASCII text and then translated by compilers and linkers into binary executable
+ﬁles.
+Processors read and interpret binary instructions that are stored in main mem-
+ory. Since computers spend most of their time copying data between memory, I/O
+devices, and the CPU registers, the storage devices in a system are arranged in a hi-
+erarchy, with the CPU registers at the top, followed by multiple levels of hardware
+cache memories, DRAM main memory, and disk storage. Storage devices that are
+higher in the hierarchy are faster and more costly per bit than those lower in the
+
+
+--- Page 58 ---
+hierarchy. Storage devices that are higher in the hierarchy serve as caches for de-
+vices that are lower in the hierarchy. Programmers can optimize the performance
+of their C programs by understanding and exploiting the memory hierarchy.
+The operating system kernel serves as an intermediary between the applica-
+tion and the hardware. It provides three fundamental abstractions: (1) Files are
+abstractions for I/O devices. (2) Virtual memory is an abstraction for both main
+memory and disks. (3) Processes are abstractions for the processor, main memory,
+and I/O devices.
+Finally, networks provide ways for computer systems to communicate with
+one another. From the viewpoint of a particular system, the network is just another
+I/O device.
+Bibliographic Notes
+Ritchie has written interesting ﬁrsthand accounts of the early days of C and
+Unix [91, 92]. Ritchie and Thompson presented the ﬁrst published account of
+Unix [93]. Silberschatz, Galvin, and Gagne [102] provide a comprehensive history
+of the different ﬂavors of Unix. The GNU (www.gnu.org) and Linux (www.linux
+.org) Web pages have loads of current and historical information. The Posix
+standards are available online at (www.unix.org).
+Solutions to Practice Problems
+Solution to Problem 1.1 (page 58)
+This problem illustrates that Amdahl’s law applies to more than just computer
+systems.
+A. In terms of Equation 1.1, we have α = 0.6 and k = 1.5. More directly, travel-
+ing the 1,500 kilometers through Montana will require 10 hours, and the rest
+of the trip also requires 10 hours. This will give a speedup of 25/(10 + 10) =
+1.25×.
+B. In terms of Equation 1.1, we have α = 0.6, and we require S = 1.67, from
+which we can solve for k. More directly, to speed up the trip by 1.67×, we
+must decrease the overall time to 15 hours. The parts outside of Montana
+will still require 10 hours, so we must drive through Montana in 5 hours.
+This requires traveling at 300 km/hr, which is pretty fast for a truck!
+Solution to Problem 1.2 (page 59)
+Amdahl’s law is best understood by working through some examples. This one
+requires you to look at Equation 1.1 from an unusual perspective. This problem
+is a simple application of the equation. You are given S = 4 and α = 0.9, and you
+must then solve for k:
+4 = 1/(1 −0.9) + 0.9/k
+0.4 + 3.6/k = 1.0
+k = 6.0

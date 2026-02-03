@@ -36,73 +36,73 @@ CHAPTERS = {
         chapter_num="02",
         chinese_title="信息的表示和处理",
         english_title="Representing and Manipulating Information",
-        page_range=(59, 198)
+        page_range=(60, 190)
     ),
     "03": ChapterInfo(
         chapter_num="03",
         chinese_title="程序的机器级表示",
         english_title="Machine-Level Representation of Programs",
-        page_range=(199, 386)
+        page_range=(191, 378)
     ),
     "04": ChapterInfo(
         chapter_num="04",
         chinese_title="处理器体系结构",
         english_title="Processor Architecture",
-        page_range=(387, 530)
+        page_range=(379, 522)
     ),
     "05": ChapterInfo(
         chapter_num="05",
         chinese_title="优化程序性能",
         english_title="Optimizing Program Performance",
-        page_range=(531, 614)
+        page_range=(523, 606)
     ),
     "06": ChapterInfo(
         chapter_num="06",
         chinese_title="存储器层次结构",
         english_title="The Memory Hierarchy",
-        page_range=(615, 704)
+        page_range=(607, 694)
     ),
     "07": ChapterInfo(
         chapter_num="07",
         chinese_title="链接",
         english_title="Linking",
-        page_range=(705, 756)
+        page_range=(696, 746)
     ),
     "08": ChapterInfo(
         chapter_num="08",
         chinese_title="异常控制流",
         english_title="Exceptional Control Flow",
-        page_range=(757, 836)
+        page_range=(747, 825)
     ),
     "09": ChapterInfo(
         chapter_num="09",
         chinese_title="虚拟内存",
         english_title="Virtual Memory",
-        page_range=(837, 924)
+        page_range=(826, 910)
     ),
     "10": ChapterInfo(
         chapter_num="10",
         chinese_title="系统级I/O",
         english_title="System-Level I/O",
-        page_range=(925, 952)
+        page_range=(912, 939)
     ),
     "11": ChapterInfo(
         chapter_num="11",
         chinese_title="网络编程",
         english_title="Network Programming",
-        page_range=(953, 1006)
+        page_range=(940, 992)
     ),
     "12": ChapterInfo(
         chapter_num="12",
         chinese_title="并发编程",
         english_title="Concurrent Programming",
-        page_range=(1007, 1076)
+        page_range=(993, 1062)
     ),
     "appendix": ChapterInfo(
         chapter_num="appendix",
         chinese_title="错误处理",
         english_title="Error Handling",
-        page_range=(1077, 1081)
+        page_range=(1063, 1067)
     ),
 }
 
