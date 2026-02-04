@@ -14,39 +14,41 @@
 |------|----------|----------|------|
 | 00 | [前言](chapters/00-前言.md) | Preface | 已翻译 |
 | 01 | [计算机系统漫游](chapters/01-计算机系统漫游.md) | A Tour of Computer Systems | 已翻译 |
-| 02 | [信息的表示和处理](chapters/02-信息的表示和处理.md) | Representing and Manipulating Information | 待翻译 |
-| 03 | [程序的机器级表示](chapters/03-程序的机器级表示.md) | Machine-Level Representation of Programs | 待翻译 |
-| 04 | [处理器体系结构](chapters/04-处理器体系结构.md) | Processor Architecture | 待翻译 |
-| 05 | [优化程序性能](chapters/05-优化程序性能.md) | Optimizing Program Performance | 待翻译 |
-| 06 | [存储器层次结构](chapters/06-存储器层次结构.md) | The Memory Hierarchy | 待翻译 |
-| 07 | [链接](chapters/07-链接.md) | Linking | 待翻译 |
-| 08 | [异常控制流](chapters/08-异常控制流.md) | Exceptional Control Flow | 待翻译 |
-| 09 | [虚拟内存](chapters/09-虚拟内存.md) | Virtual Memory | 待翻译 |
-| 10 | [系统级I/O](chapters/10-系统级IO.md) | System-Level I/O | 待翻译 |
-| 11 | [网络编程](chapters/11-网络编程.md) | Network Programming | 待翻译 |
-| 12 | [并发编程](chapters/12-并发编程.md) | Concurrent Programming | 待翻译 |
-| 附录 | [错误处理](chapters/appendix-错误处理.md) | Error Handling | 待翻译 |
+| 02 | [信息的表示和处理](chapters/02-信息的表示和处理.md) | Representing and Manipulating Information | 已翻译 |
+| 03 | 程序的机器级表示 | Machine-Level Representation of Programs | 待翻译 |
+| 04 | 处理器体系结构 | Processor Architecture | 待翻译 |
+| 05 | 优化程序性能 | Optimizing Program Performance | 待翻译 |
+| 06 | 存储器层次结构 | The Memory Hierarchy | 待翻译 |
+| 07 | 链接 | Linking | 待翻译 |
+| 08 | 异常控制流 | Exceptional Control Flow | 待翻译 |
+| 09 | 虚拟内存 | Virtual Memory | 待翻译 |
+| 10 | 系统级I/O | System-Level I/O | 待翻译 |
+| 11 | 网络编程 | Network Programming | 待翻译 |
+| 12 | 并发编程 | Concurrent Programming | 待翻译 |
+| 附录 | 错误处理 | Error Handling | 待翻译 |
 
 ## 目录结构
 
 ```
 CSAPP/
-├── README.md           # 本文件
-├── INSTALL.md          # 环境安装说明
-├── CSAPP_2016.pdf      # 原版 PDF
-├── chapters/           # Markdown 章节文件
+├── README.md              # 本文件
+├── INSTALL.md             # 环境安装说明
+├── CSAPP_2016.pdf         # 原版 PDF
+├── chapter_mapping.py     # 章节映射和术语表
+├── ocr_workflow.py        # PaddleOCR 工作流脚本
+├── chapters/              # 翻译后的 Markdown 章节
+│   ├── 00-前言.md
 │   ├── 01-计算机系统漫游.md
-│   ├── 02-信息的表示和处理.md
 │   └── ...
-├── code/               # 代码示例
-│   ├── ch01/          # 第1章代码
-│   ├── ch02/          # 第2章代码
+├── code/                  # 代码示例
+│   ├── conc/             # 并发编程
+│   ├── data/             # 数据表示
+│   ├── ecf/              # 异常控制流
 │   └── ...
-├── figures/            # 图片资源
-├── chapter_mapping.py  # 章节映射配置
-├── extract_chapters.py # PDF 提取脚本
-├── text_to_markdown.py # Markdown 转换脚本
-└── convert_csapp.py    # 主转换脚本
+└── figures/               # 图片资源
+    ├── ch01/
+    ├── ch02/
+    └── ...
 ```
 
 ## 使用方法
@@ -60,31 +62,33 @@ conda activate book
 # 或者按照 INSTALL.md 安装依赖
 ```
 
-### 转换章节
+### PaddleOCR 工作流
 
 ```bash
-# 查看所有章节
-python convert_csapp.py --list
+# 查看工作流状态
+python ocr_workflow.py status
 
-# 转换单个章节
-python convert_csapp.py -c 01
+# 将 PDF 转换为图片 (300 DPI)
+python ocr_workflow.py pdf2img --dpi 300
 
-# 转换多个章节
-python convert_csapp.py -c 01 02 03
+# 按章节整理图片
+python ocr_workflow.py organize --chapters 01 02
 
-# 转换所有章节
-python convert_csapp.py --all
+# 运行 OCR 提取
+python ocr_workflow.py ocr --chapter 01 --device gpu:0
 
-# 生成章节模板（不提取内容）
-python convert_csapp.py -c 01 --template
+# 拼接 OCR 结果为章节文档
+python ocr_workflow.py concat --chapter 01
+
+# 完整流程 (PDF → 图片 → OCR → 拼接)
+python ocr_workflow.py pipeline --chapters 01 02
 ```
 
-### 翻译工作流程
+### 翻译工作流
 
-1. 运行脚本提取章节原文
-2. 在 Claude 对话中逐节翻译为中文
-3. 将翻译结果更新到对应的 Markdown 文件
-4. 提取代码示例到 `code/` 目录
+1. 运行 `ocr_workflow.py` 提取章节原文
+2. 使用 `/translate-csapp` 命令翻译为中文
+3. 将翻译结果保存到 `chapters/` 目录
 
 ## 学习资源
 
