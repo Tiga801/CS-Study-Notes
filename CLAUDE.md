@@ -28,12 +28,45 @@ python Books/CSAPP/convert_csapp.py -c 01 --template
 python Books/CSAPP/extract_chapters.py 01
 ```
 
+## PaddleOCR Workflow Commands
+
+```bash
+# Show workflow status for all chapters
+python Books/CSAPP/ocr_workflow.py status
+
+# Convert PDF to images (300 DPI)
+python Books/CSAPP/ocr_workflow.py pdf2img --dpi 300
+
+# Organize images by chapter
+python Books/CSAPP/ocr_workflow.py organize --chapters 01 02
+
+# Run OCR extraction on a chapter
+python Books/CSAPP/ocr_workflow.py ocr --chapter 01 --device gpu:0
+
+# Concatenate OCR results into chapter document
+python Books/CSAPP/ocr_workflow.py concat --chapter 01
+
+# Run full pipeline (PDF → images → OCR → concat)
+python Books/CSAPP/ocr_workflow.py pipeline --chapters 01 02
+```
+
 ## CSAPP Translation Workflow
+
+### Method 1: PyMuPDF (Text-based extraction)
 
 1. **Extract** chapter from PDF → generates `raw_text/XX-章节名_raw.txt`
 2. **Translate** using `/translate-csapp <file>` command with terminology glossary
 3. **Update** corresponding `chapters/XX-章节名.md` file
 4. **Commit** with format: `feat: CSAPP 第XX章中文翻译`
+
+### Method 2: PaddleOCR (Image-based OCR)
+
+1. **Convert** PDF to images → `extract_images/all/`
+2. **Organize** images by chapter → `extract_images/{chapter}/`
+3. **OCR** with PaddleOCR-VL-1.5 → `paddleocr_texts/{chapter}/`
+4. **Concat** into chapter document → `raw_texts/{chapter}-{english_title}.md`
+5. **Translate** using `/translate-csapp` or `/ocr-workflow translate`
+6. **Commit** with format: `feat: CSAPP 第XX章中文翻译`
 
 ## Key Files
 
@@ -42,7 +75,9 @@ python Books/CSAPP/extract_chapters.py 01
 | `Books/CSAPP/chapter_mapping.py` | Chapter metadata, page ranges, and 60+ term glossary |
 | `Books/CSAPP/convert_csapp.py` | Main conversion orchestrator |
 | `Books/CSAPP/extract_chapters.py` | PDF text extraction (PyMuPDF) |
+| `Books/CSAPP/ocr_workflow.py` | PaddleOCR-based extraction workflow |
 | `Books/CSAPP/.claude/commands/translate-csapp.md` | Translation command with glossary |
+| `Books/CSAPP/.claude/commands/ocr-workflow.md` | OCR workflow command |
 
 ## Translation Glossary (Mandatory Terms)
 
@@ -63,4 +98,19 @@ These terms from `chapter_mapping.GLOSSARY` must be used consistently:
 
 ## Environment
 
-Python 3.10 with `conda activate book`. Required packages: pymupdf (fitz), pdfplumber.
+Python 3.10 with `conda activate book`.
+
+### Required Packages
+
+**Core:**
+- pymupdf (fitz)
+- pdfplumber
+
+**PaddleOCR Workflow:**
+- paddlepaddle-gpu (or paddlepaddle for CPU)
+- paddleocr[doc-parser]
+- pdf2image
+- tqdm
+
+**System Dependencies:**
+- poppler-utils (for pdf2image): `sudo apt-get install poppler-utils`

@@ -32,6 +32,12 @@ CHAPTERS = {
         english_title="A Tour of Computer Systems",
         page_range=(31, 58)
     ),
+    "partI": ChapterInfo(
+        chapter_num="partI",
+        chinese_title="第一部分 程序结构与执行",
+        english_title="Part I Program Structure and Execution",
+        page_range=(59, 59)
+    ),
     "02": ChapterInfo(
         chapter_num="02",
         chinese_title="信息的表示和处理",
@@ -62,6 +68,12 @@ CHAPTERS = {
         english_title="The Memory Hierarchy",
         page_range=(607, 694)
     ),
+    "PartII": ChapterInfo(
+        chapter_num="PartII",
+        chinese_title="第二部分  在系统上运行程序",
+        english_title="Part II Running Programs on a System",
+        page_range=(695, 695)
+    ),
     "07": ChapterInfo(
         chapter_num="07",
         chinese_title="链接",
@@ -79,6 +91,12 @@ CHAPTERS = {
         chinese_title="虚拟内存",
         english_title="Virtual Memory",
         page_range=(826, 910)
+    ),
+    "PartIII": ChapterInfo(
+        chapter_num="PartIII",
+        chinese_title="第三部分 程序之间的交互与通信",
+        english_title="Part III Interaction and Communication between Programs",
+        page_range=(911, 911)
     ),
     "10": ChapterInfo(
         chapter_num="10",
@@ -103,6 +121,18 @@ CHAPTERS = {
         chinese_title="错误处理",
         english_title="Error Handling",
         page_range=(1063, 1067)
+    ),
+    "reference": ChapterInfo(
+        chapter_num="reference",
+        chinese_title="参考文献",
+        english_title="References",
+        page_range=(1068, 1073)
+    ),
+    "index": ChapterInfo(
+        chapter_num="index",
+        chinese_title="索引",
+        english_title="Index",
+        page_range=(1074, 1105)
     ),
 }
 
