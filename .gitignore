@@ -58,6 +58,7 @@ Thumbs.db
 *.temp
 *.log
 *.bak
+*_part*.md
 *extract_images/
 *paddleocr_texts/
 
