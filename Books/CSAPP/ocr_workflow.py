@@ -10,12 +10,14 @@ PaddleOCR PDF 提取工作流脚本
 
 使用方法:
     python ocr_workflow.py --help
-    python ocr_workflow.py pdf2img --dpi 300
-    python ocr_workflow.py organize --chapters 01 02
-    python ocr_workflow.py ocr --chapter 01 --device gpu:0
-    python ocr_workflow.py concat --chapter 01
-    python ocr_workflow.py pipeline --chapters 01 02
-    python ocr_workflow.py status
+    python ocr_workflow.py status                          # 显示状态
+    python ocr_workflow.py pdf2img --dpi 300               # 转换 PDF
+    python ocr_workflow.py organize --chapters 01 02       # 整理图片
+    python ocr_workflow.py ocr --chapter 01                # OCR 提取
+    python ocr_workflow.py concat --chapter 01             # 拼接文档
+    python ocr_workflow.py pipeline --chapters 01          # 完整流程
+    python ocr_workflow.py extract-img --chapter 01        # 提取章节图片
+    python ocr_workflow.py extract-img --chapter all       # 提取所有章节图片
 """
 
 import argparse
@@ -23,6 +25,7 @@ import gc
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -64,6 +67,10 @@ class Config:
     @property
     def chapters_dir(self) -> Path:
         return self.base_dir / "chapters"
+
+    @property
+    def paddleocr_images_dir(self) -> Path:
+        return self.base_dir / "paddleocr_images"
 
     # 默认设置
     default_dpi: int = 300
@@ -543,6 +550,154 @@ class ChapterConcatenator:
 
 
 # ============================================================================
+# 图片提取（从 raw_texts 文档中提取 ROI 图片）
+# ============================================================================
+
+class RawTextImageExtractor:
+    """
+    从 raw_texts 章节文档中提取图片 ROI 并保存到持久目录
+
+    流程:
+    1. 扫描 raw_texts/{chapter}.md 中的 img_in_image_box_L_T_R_B.jpg 引用
+    2. 向上查找最近的 <!-- Page XXXX --> 注释获取页码
+    3. 从 extract_images/{chapter}/{page}.png 中裁剪 ROI
+    4. 保存到 paddleocr_images/{chapter}/page-{page}-{i}.jpg
+    5. 更新文档中的图片路径
+    """
+
+    # 正则：匹配图片行中的文件名
+    IMG_PATTERN = re.compile(
+        r'src="imgs/(img_in_image_box_(\d+)_(\d+)_(\d+)_(\d+)\.jpg)"'
+    )
+    # 正则：匹配页码注释
+    PAGE_PATTERN = re.compile(r'<!-- Page (\d{4}) -->')
+
+    def __init__(self, config: Config):
+        self.config = config
+
+    def extract_chapter(self, chapter_num: str, force: bool = False) -> dict:
+        """
+        提取单个章节的所有图片并更新文档路径
+
+        Returns:
+            {"extracted": int, "skipped": int, "errors": int, "output_path": str}
+        """
+        # 查找对应的 raw_texts 文件
+        raw_text_path = self._find_raw_text(chapter_num)
+        if raw_text_path is None:
+            raise ValueError(f"未找到章节 {chapter_num} 的 raw_texts 文件")
+
+        images_src_dir = self.config.images_dir / chapter_num
+        if not images_src_dir.exists():
+            raise ValueError(f"章节图片目录不存在: {images_src_dir}")
+
+        images_out_dir = self.config.paddleocr_images_dir / chapter_num
+        images_out_dir.mkdir(parents=True, exist_ok=True)
+
+        lines = raw_text_path.read_text(encoding="utf-8").splitlines()
+
+        stats = {"extracted": 0, "skipped": 0, "errors": 0}
+        current_page = None
+        page_counts: dict = {}   # page_num -> count of images seen on this page
+        replacements: list = []  # [(old_src, new_src)]
+
+        for i, line in enumerate(lines):
+            # 更新当前页码
+            page_match = self.PAGE_PATTERN.search(line)
+            if page_match:
+                current_page = page_match.group(1)
+                continue
+
+            # 检查是否包含图片引用
+            img_match = self.IMG_PATTERN.search(line)
+            if not img_match:
+                continue
+
+            if current_page is None:
+                logger.warning(f"第 {i+1} 行图片无法确定页码，跳过")
+                stats["errors"] += 1
+                continue
+
+            # 解析坐标
+            orig_filename = img_match.group(1)
+            left, top, right, bottom = (
+                int(img_match.group(2)),
+                int(img_match.group(3)),
+                int(img_match.group(4)),
+                int(img_match.group(5)),
+            )
+
+            # 计算本页图片序号（从 1 开始）
+            page_counts[current_page] = page_counts.get(current_page, 0) + 1
+            img_index = page_counts[current_page]
+
+            # 目标文件路径
+            out_filename = f"page-{current_page}-{img_index}.jpg"
+            out_path = images_out_dir / out_filename
+
+            if out_path.exists() and not force:
+                stats["skipped"] += 1
+            else:
+                # 加载源图片并裁剪
+                src_image_path = images_src_dir / f"{current_page}.png"
+                if not src_image_path.exists():
+                    logger.warning(f"源图片不存在: {src_image_path}")
+                    stats["errors"] += 1
+                    continue
+
+                try:
+                    from PIL import Image
+                    img = Image.open(src_image_path)
+                    roi = img.crop((left, top, right, bottom))
+                    roi.save(out_path, "JPEG", quality=95)
+                    stats["extracted"] += 1
+                    logger.debug(f"提取: {out_path.name}")
+                except Exception as e:
+                    logger.warning(f"裁剪失败 {orig_filename}: {e}")
+                    stats["errors"] += 1
+                    continue
+
+            # 记录路径替换（无论 skip/extract 都替换路径）
+            new_src = f"../paddleocr_images/{chapter_num}/{out_filename}"
+            replacements.append((f'src="imgs/{orig_filename}"', f'src="{new_src}"'))
+
+        # 应用路径替换并写回文件
+        if replacements:
+            content = raw_text_path.read_text(encoding="utf-8")
+            for old, new in replacements:
+                content = content.replace(old, new)
+            raw_text_path.write_text(content, encoding="utf-8")
+
+        logger.info(
+            f"章节 {chapter_num}: 提取 {stats['extracted']}, "
+            f"跳过 {stats['skipped']}, 错误 {stats['errors']}"
+        )
+        stats["output_path"] = str(raw_text_path)
+        return stats
+
+    def extract_all(self, force: bool = False) -> dict:
+        """提取所有章节的图片"""
+        results = {}
+        for chapter_num in CHAPTERS:
+            raw_text = self._find_raw_text(chapter_num)
+            if raw_text is None:
+                continue
+            try:
+                results[chapter_num] = self.extract_chapter(chapter_num, force=force)
+            except Exception as e:
+                logger.error(f"章节 {chapter_num} 提取失败: {e}")
+                results[chapter_num] = {"error": str(e)}
+        return results
+
+    def _find_raw_text(self, chapter_num: str) -> Optional[Path]:
+        """查找章节对应的 raw_texts 文件（前缀匹配）"""
+        raw_texts_dir = self.config.raw_texts_dir
+        pattern = f"{chapter_num}-*.md"
+        matches = list(raw_texts_dir.glob(pattern))
+        return matches[0] if matches else None
+
+
+# ============================================================================
 # 工作流编排
 # ============================================================================
 
@@ -722,6 +877,8 @@ def main():
   python ocr_workflow.py ocr --chapter 01                # OCR 提取
   python ocr_workflow.py concat --chapter 01             # 拼接文档
   python ocr_workflow.py pipeline --chapters 01          # 完整流程
+  python ocr_workflow.py extract-img --chapter 01       # 提取章节图片
+  python ocr_workflow.py extract-img --chapter all      # 提取所有章节图片
         """
     )
 
@@ -805,6 +962,17 @@ def main():
     pipeline_parser.add_argument(
         "--copy", action="store_true",
         help="复制图片而非符号链接"
+    )
+
+    # extract-img 命令
+    extract_img_parser = subparsers.add_parser("extract-img", help="从 raw_texts 文档中提取图片 ROI")
+    extract_img_parser.add_argument(
+        "--chapter", required=True,
+        help="章节编号 (如: --chapter 01 或 --chapter all)"
+    )
+    extract_img_parser.add_argument(
+        "--force", action="store_true",
+        help="强制重新提取（不跳过已存在）"
     )
 
     args = parser.parse_args()
@@ -901,6 +1069,31 @@ def main():
             print("\n错误:")
             for err in results["errors"]:
                 print(f"  - {err}")
+
+    elif args.command == "extract-img":
+        extractor = RawTextImageExtractor(CONFIG)
+        if args.chapter == "all":
+            results = extractor.extract_all(force=args.force)
+            print("\n图片提取结果:")
+            for ch, result in results.items():
+                if "error" in result:
+                    print(f"  [✗] 章节 {ch}: {result['error']}")
+                else:
+                    print(
+                        f"  [✓] 章节 {ch}: "
+                        f"提取 {result['extracted']}, "
+                        f"跳过 {result['skipped']}, "
+                        f"错误 {result['errors']}"
+                    )
+        else:
+            result = extractor.extract_chapter(args.chapter, force=args.force)
+            print(
+                f"章节 {args.chapter}: "
+                f"提取 {result['extracted']}, "
+                f"跳过 {result['skipped']}, "
+                f"错误 {result['errors']}"
+            )
+            print(f"文档路径: {result['output_path']}")
 
     else:
         parser.print_help()
