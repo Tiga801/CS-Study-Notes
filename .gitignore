@@ -61,6 +61,7 @@ Thumbs.db
 *_part*.md
 *extract_images/
 *paddleocr_texts/
+*paddleocr_images/
 
 # Claude plans (local only)
 .claude/plans/

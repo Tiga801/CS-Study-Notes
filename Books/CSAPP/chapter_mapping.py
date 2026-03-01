@@ -100,8 +100,8 @@ CHAPTERS = {
     ),
     "10": ChapterInfo(
         chapter_num="10",
-        chinese_title="系统级I/O",
-        english_title="System-Level I/O",
+        chinese_title="系统级IO",
+        english_title="System-Level IO",
         page_range=(912, 939)
     ),
     "11": ChapterInfo(
